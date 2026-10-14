@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Mart Enterprise - Inventory & Invoice Manager</title>
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printableInvoice, #printableInvoice * {
+                visibility: visible;
+            }
+            #printableInvoice {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white;
+                padding: 20px;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center bg-gray-900 px-4">
+        <div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
+            <h2 class="text-2xl font-bold text-center text-blue-600 mb-2">Good Mart Enterprise</h2>
+            <p class="text-center text-gray-500 mb-6 text-sm">দয়া করে আপনার লগইন তথ্য দিন</p>
+            
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">ইউজারনেম (Username):</label>
+                    <input type="text" id="username" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="ইউজারনেম লিখুন">
+                </div>
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">পাসওয়ার্ড (Password):</label>
+                    <input type="password" id="password" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="পাসওয়ার্ড লিখুন">
+                </div>
+                <p id="loginError" class="text-red-500 text-xs hidden font-bold text-center">ভুল ইউজারনেম অথবা পাসওয়ার্ড!</p>
+                <div>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full focus:outline-none focus:shadow-outline">
+                        লগইন করুন
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="mainApp" class="container mx-auto px-4 py-8 max-w-6xl hidden">
+        <div class="flex justify-between items-center mb-6 no-print">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-600">Good Mart Enterprise</h1>
+                <p class="text-gray-600">স্টক ও লেনদেন ম্যানেজমেন্ট সিস্টেম</p>
+            </div>
+            <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded text-sm">লগআউট</button>
+        </div>
+
+        <!-- Form Section -->
+        <div class="bg-white shadow-md rounded-lg p-6 mb-8 no-print">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">নতুন এন্ট্রি করুন</h2>
+            <form id="invoiceForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                
+                <!-- Date -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">তারিখ (Date):</label>
+                    <input type="date" id="date" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+
+                <!-- Brand Dropdown -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">ব্র্যান্ড (Brand):</label>
+                    <select id="brandSelect" class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="Kodomo">Kodomo</option>
+                        <option value="Fogg">Fogg</option>
+                        <option value="Nivea">Nivea</option>
+                    </select>
+                </div>
+
+                <!-- Invoice Type Dropdown -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">লেনদেনের ধরন (Transaction Name):</label>
+                    <select id="invoiceType" onchange="handleTypeChange()" class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="Stock In">Stock In</option>
+                        <option value="Stock Out">Stock Out</option>
+                    </select>
+                </div>
+
+                <!-- Invoice Number -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">ইনভয়েস নম্বর (Invoice Number):</label>
+                    <input type="text" id="invoiceNumber" readonly class="bg-gray-100 shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight">
+                </div>
+
+                <!-- Credit Value Container (Stock In) -->
+                <div id="creditContainer">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">স্টক ইন (Stock In):</label>
+                    <input type="number" id="credit" step="0.01" placeholder="0.00" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+
+                <!-- Debit & Claim Value Container (Stock Out) -->
+                <div id="debitContainer" class="hidden flex gap-2">
+                    <div class="w-1/2">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">স্টক আউট (Stock Out):</label>
+                        <input type="number" id="debit" step="0.01" placeholder="0.00" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">ক্লেইম (Claim):</label>
+                        <input type="number" id="claim" step="0.01" placeholder="0.00" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="flex items-end lg:col-span-3">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
+                        Submit
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Filter, Search & Table Section -->
+        <div class="bg-white shadow-md rounded-lg overflow-hidden p-6 no-print">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 items-end">
+                <!-- Month Filter -->
+                <div>
+                    <label class="text-gray-700 font-bold text-sm block mb-1">মাস:</label>
+                    <select id="monthFilter" onchange="currentPage = 1; renderTable();" class="shadow border rounded py-2 px-3 text-gray-700 w-full leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="">সকল মাস</option>
+                    </select>
+                </div>
+
+                <!-- Search by Date -->
+                <div>
+                    <label class="text-gray-700 font-bold text-sm block mb-1">তারিখ দিয়ে খুঁজুন:</label>
+                    <input type="date" id="searchDate" onchange="currentPage = 1; renderTable();" class="shadow border rounded py-2 px-3 text-gray-700 w-full leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+
+                <!-- Search by Brand -->
+                <div>
+                    <label class="text-gray-700 font-bold text-sm block mb-1">ব্র্যান্ড দিয়ে খুঁজুন:</label>
+                    <select id="searchBrand" onchange="currentPage = 1; renderTable();" class="shadow border rounded py-2 px-3 text-gray-700 w-full leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="">সকল ব্র্যান্ড</option>
+                        <option value="Kodomo">Kodomo</option>
+                        <option value="Fogg">Fogg</option>
+                        <option value="Nivea">Nivea</option>
+                    </select>
+                </div>
+
+                <!-- Invoice Number Search Box -->
+                <div>
+                    <label class="text-gray-700 font-bold text-sm block mb-1">ইনভয়েস খুঁজুন:</label>
+                    <input type="text" id="searchInvoice" placeholder="নম্বর দিয়ে খুঁজুন..." onkeyup="currentPage = 1; renderTable();" class="shadow border rounded py-2 px-3 text-gray-700 w-full leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-700">সকল লেনদেনের তালিকা</h2>
+                <button onclick="exportData()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm">ডেটা এক্সপোর্ট (CSV)</button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200">
+                    <thead>
+                        <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+                            <th class="py-3 px-6 text-left">Date</th>
+                            <th class="py-3 px-6 text-left">Brand (ব্র্যান্ড)</th>
+                            <th class="py-3 px-6 text-left">Transaction Name</th>
+                            <th class="py-3 px-6 text-left">Invoice Number</th>
+                            <th class="py-3 px-6 text-right">Stock In</th>
+                            <th class="py-3 px-6 text-right">Stock Out</th>
+                            <th class="py-3 px-6 text-right">Claim</th>
+                            <th class="py-3 px-6 text-right">Net Stock Out</th>
+                            <th class="py-3 px-6 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="text-gray-600 text-sm font-light">
+                        <!-- Dynamically filled -->
+                    </tbody>
+                    <tfoot>
+                        <tr class="bg-gray-100 font-bold text-gray-700 border-t-2 border-gray-300">
+                            <td colspan="4" class="py-3 px-6 text-right">Monthly Total:</td>
+                            <td id="totalCredit" class="py-3 px-6 text-right">0.00</td>
+                            <td id="totalDebit" class="py-3 px-6 text-right">0.00</td>
+                            <td id="totalClaim" class="py-3 px-6 text-right">0.00</td>
+                            <td id="totalNetStockOut" class="py-3 px-6 text-right">0.00</td>
+                            <td></td>
+                        </tr>
+                        <tr class="bg-blue-50 font-bold text-blue-800">
+                            <td colspan="4" class="py-3 px-6 text-right">Stock Remaining:</td>
+                            <td colspan="5" id="closingBalance" class="py-3 px-6 text-left text-base">0.00</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div id="paginationControls" class="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
+                <!-- Dynamically filled -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Printable Invoice Modal -->
+    <div id="invoiceModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-lg p-8 max-w-lg w-full shadow-2xl relative">
+            <button onclick="closeInvoiceModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-xl font-bold no-print">&times;</button>
+            
+            <!-- Printable Area -->
+            <div id="printableInvoice" class="p-4 bg-white">
+                <div class="text-center border-b pb-4 mb-4">
+                    <h2 class="text-2xl font-bold text-blue-800">Good Mart Enterprise</h2>
+                    <p class="text-sm text-gray-600">Proprietor: Md Al Helal Khan</p>
+                    <p class="text-sm text-gray-600">Mobile Number: 01714692560</p>
+                    <p class="text-sm text-gray-600">Address: Kamarpara, Rangpur</p>
+                </div>
+
+                <div class="mb-4 flex justify-between text-sm text-gray-700">
+                    <div>
+                        <p><strong>Invoice Number:</strong> <span id="printInvoiceNum"></span></p>
+                    </div>
+                    <div>
+                        <p><strong>Date:</strong> <span id="printDate"></span></p>
+                    </div>
+                </div>
+
+                <!-- Current Transaction Details -->
+                <div class="mb-4">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase mb-1">Current Transaction</h3>
+                    <table class="w-full border-collapse border border-gray-300 text-sm">
+                        <tr class="bg-gray-100">
+                            <th class="border border-gray-300 p-2 text-left">Brand</th>
+                            <th class="border border-gray-300 p-2 text-left">Transaction Name</th>
+                            <th class="border border-gray-300 p-2 text-right">Amount</th>
+                        </tr>
+                        <tr>
+                            <td id="printBrand" class="border border-gray-300 p-2"></td>
+                            <td id="printType" class="border border-gray-300 p-2"></td>
+                            <td id="printAmount" class="border border-gray-300 p-2 text-right"></td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Monthly Summary & Stock Remaining -->
+                <div class="mb-4 bg-gray-50 p-3 rounded border border-gray-200 text-sm">
+                    <h3 class="text-xs font-bold text-gray-600 uppercase mb-2">Monthly Summary (এই মাসের হিসাব)</h3>
+                    <div class="flex justify-between py-1 border-b border-gray-200">
+                        <span class="text-gray-600">Total Stock In:</span>
+                        <span id="printMonthCredit" class="font-semibold text-gray-800">0.00</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-gray-200">
+                        <span class="text-gray-600">Total Stock Out:</span>
+                        <span id="printMonthDebit" class="font-semibold text-gray-800">0.00</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-gray-200">
+                        <span class="text-gray-600">Total Claim:</span>
+                        <span id="printMonthClaim" class="font-semibold text-gray-800">0.00</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-gray-200">
+                        <span class="text-gray-600">Total Net Stock Out:</span>
+                        <span id="printMonthNetStockOut" class="font-semibold text-gray-800">0.00</span>
+                    </div>
+                    <div class="flex justify-between py-1 font-bold text-blue-800 mt-1">
+                        <span>Stock Remaining:</span>
+                        <span id="printClosingBalance">0.00</span>
+                    </div>
+                </div>
+
+                <div class="mt-8 text-center text-xs text-gray-500">
+                    <p>Thank you for doing business with us!</p>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 flex gap-4 no-print">
+                <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Print Invoice</button>
+                <button onclick="closeInvoiceModal()" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded w-full">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK & App Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-analytics.js";
+        import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAEE9A8KVaYYescQaZIqqll0N-shR35V5I",
+            authDomain: "kodomo-stock-count.firebaseapp.com",
+            projectId: "kodomo-stock-count",
+            storageBucket: "kodomo-stock-count.firebasestorage.app",
+            messagingSenderId: "592258548445",
+            appId: "1:592258548445:web:beefd0ef76b23e4f689134",
+            measurementId: "G-68MB6J7EJJ"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
+
+        const CORRECT_USER = "kodomo";
+        const CORRECT_PASS = "Helal9090";
+
+        let entries = [];
+        let nextInvoiceNum = 1;
+        let currentPage = 1;
+        const rowsPerPage = 10;
+
+        window.onload = function() {
+            if (localStorage.getItem("isLoggedIn") === "true") {
+                showMainApp();
+            }
+        };
+
+        window.handleLogin = function(event) {
+            event.preventDefault();
+            const userInput = document.getElementById("username").value.trim();
+            const passInput = document.getElementById("password").value.trim();
+            const errorMsg = document.getElementById("loginError");
+
+            if (userInput === CORRECT_USER && passInput === CORRECT_PASS) {
+                localStorage.setItem("isLoggedIn", "true");
+                showMainApp();
+            } else {
+                errorMsg.classList.remove("hidden");
+            }
+        };
+
+        function showMainApp() {
+            document.getElementById("loginScreen").classList.add("hidden");
+            document.getElementById("mainApp").classList.remove("hidden");
+            document.getElementById('date').valueAsDate = new Date();
+            loadEntriesFromCloud();
+        }
+
+        window.handleLogout = function() {
+            localStorage.removeItem("isLoggedIn");
+            document.getElementById("mainApp").classList.add("hidden");
+            document.getElementById("loginScreen").classList.remove("hidden");
+            document.getElementById("username").value = "";
+            document.getElementById("password").value = "";
+            document.getElementById("loginError").classList.add("hidden");
+        };
+
+        async function loadEntriesFromCloud() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "invoices"));
+                entries = [];
+                querySnapshot.forEach((document) => {
+                    entries.push({ id: document.id, ...document.data() });
+                });
+
+                entries.sort((a, b) => parseInt(a.number) - parseInt(b.number));
+
+                if (entries.length > 0) {
+                    let maxNum = Math.max(...entries.map(e => parseInt(e.number) || 0));
+                    nextInvoiceNum = maxNum >= 1 ? maxNum + 1 : 1;
+                } else {
+                    nextInvoiceNum = 1;
+                }
+                document.getElementById('invoiceNumber').value = nextInvoiceNum;
+
+                updateMonthFilter();
+                renderTable();
+            } catch (error) {
+                console.error("Error getting documents: ", error);
+                alert("ক্লাউড থেকে ডেটা লোড করতে সমস্যা হচ্ছে।");
+            }
+        }
+
+        window.handleTypeChange = function() {
+            const type = document.getElementById("invoiceType").value;
+            const creditContainer = document.getElementById("creditContainer");
+            const debitContainer = document.getElementById("debitContainer");
+            const creditInput = document.getElementById("credit");
+            const debitInput = document.getElementById("debit");
+            const claimInput = document.getElementById("claim");
+
+            if (type === "Stock In") {
+                creditContainer.classList.remove("hidden");
+                debitContainer.classList.add("hidden");
+                debitInput.value = "";
+                claimInput.value = "";
+            } else {
+                creditContainer.classList.add("hidden");
+                debitContainer.classList.remove("hidden");
+                creditInput.value = "";
+            }
+        };
+
+        function updateMonthFilter() {
+            const monthFilter = document.getElementById("monthFilter");
+            let currentSelected = monthFilter.value;
+            
+            let months = [...new Set(entries.map(item => item.date ? item.date.substring(0, 7) : ''))].filter(Boolean);
+            months.sort().reverse();
+
+            monthFilter.innerHTML = '<option value="">সকল মাস</option>';
+            
+            months.forEach(m => {
+                let option = document.createElement("option");
+                option.value = m;
+                let [year, month] = m.split('-');
+                let dateObj = new Date(year, month - 1, 1);
+                option.textContent = dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                monthFilter.appendChild(option);
+            });
+
+            if (months.includes(currentSelected)) {
+                monthFilter.value = currentSelected;
+            }
+        }
+
+        window.renderTable = function() {
+            const tableBody = document.getElementById("tableBody");
+            const monthFilter = document.getElementById("monthFilter").value;
+            const searchDate = document.getElementById("searchDate").value;
+            const searchBrand = document.getElementById("searchBrand").value;
+            const searchQuery = document.getElementById("searchInvoice").value.trim().toLowerCase();
+            
+            tableBody.innerHTML = "";
+            
+            let filteredEntries = entries.filter(item => {
+                let matchesMonth = monthFilter ? (item.date && item.date.startsWith(monthFilter)) : true;
+                let matchesDate = searchDate ? (item.date === searchDate) : true;
+                let matchesBrand = searchBrand ? (item.brand === searchBrand) : true;
+                let matchesSearch = searchQuery ? (item.number && item.number.toString().toLowerCase().includes(searchQuery)) : true;
+                return matchesMonth && matchesDate && matchesBrand && matchesSearch;
+            });
+
+            let previousOpeningBalance = 0;
+            if (monthFilter) {
+                let sortedMonths = [...new Set(entries.map(i => i.date ? i.date.substring(0, 7) : ''))].filter(Boolean).sort();
+                let pastMonths = sortedMonths.filter(m => m < monthFilter);
+                
+                pastMonths.forEach(m => {
+                    let mEntries = entries.filter(e => e.date && e.date.startsWith(m));
+                    let mCredit = 0, mDebit = 0;
+                    mEntries.forEach(e => {
+                        if(e.credit) mCredit += parseFloat(e.credit);
+                        if(e.debit) mDebit += parseFloat(e.debit);
+                    });
+                    previousOpeningBalance += (mCredit - mDebit);
+                });
+            }
+
+            let totalCredit = 0;
+            let totalDebit = 0;
+            let totalClaim = 0;
+            let totalNetStockOut = 0;
+
+            filteredEntries.forEach((item) => {
+                if(item.credit) totalCredit += parseFloat(item.credit);
+                if(item.debit) totalDebit += parseFloat(item.debit);
+                if(item.claim) totalClaim += parseFloat(item.claim);
+            });
+
+            totalNetStockOut = totalDebit - totalClaim;
+
+            if (filteredEntries.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="9" class="py-4 text-center text-gray-400">কোনো লেনদেন পাওয়া যায়নি।</td></tr>`;
+                document.getElementById("totalCredit").innerText = "0.00";
+                document.getElementById("totalDebit").innerText = "0.00";
+                document.getElementById("totalClaim").innerText = "0.00";
+                document.getElementById("totalNetStockOut").innerText = "0.00";
+                document.getElementById("closingBalance").innerText = "0.00";
+                document.getElementById("paginationControls").innerHTML = "";
+                return;
+            }
+
+            let totalPages = Math.ceil(filteredEntries.length / rowsPerPage);
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            let startIndex = (currentPage - 1) * rowsPerPage;
+            let endIndex = startIndex + rowsPerPage;
+            let paginatedEntries = filteredEntries.slice(startIndex, endIndex);
+
+            paginatedEntries.forEach((item) => {
+                let debitVal = item.debit ? parseFloat(item.debit) : 0;
+                let claimVal = item.claim ? parseFloat(item.claim) : 0;
+                let netOutVal = debitVal > 0 ? (debitVal - claimVal) : 0;
+
+                let row = `<tr class="border-b border-gray-200 hover:bg-gray-100">
+                    <td class="py-3 px-6 text-left">${item.date || ''}</td>
+                    <td class="py-3 px-6 text-left font-medium text-gray-700">${item.brand || 'Kodomo'}</td>
+                    <td class="py-3 px-6 text-left">${item.type}</td>
+                    <td class="py-3 px-6 text-left font-semibold text-blue-600 cursor-pointer hover:underline" onclick="openInvoiceByNumber('${item.number}')" title="ইনভয়েস দেখতে ক্লিক করুন">${item.number}</td>
+                    <td class="py-3 px-6 text-right">${item.credit ? parseFloat(item.credit).toFixed(2) : ''}</td>
+                    <td class="py-3 px-6 text-right">${item.debit ? parseFloat(item.debit).toFixed(2) : ''}</td>
+                    <td class="py-3 px-6 text-right">${item.claim ? parseFloat(item.claim).toFixed(2) : ''}</td>
+                    <td class="py-3 px-6 text-right font-medium text-purple-700">${debitVal > 0 ? netOutVal.toFixed(2) : ''}</td>
+                    <td class="py-3 px-6 text-center">
+                        <button onclick="deleteEntry('${item.id}')" class="text-red-500 hover:text-red-700 font-bold">মুছুন</button>
+                    </td>
+                </tr>`;
+                tableBody.innerHTML += row;
+            });
+
+            let monthlyNetBalance = totalCredit - totalDebit;
+            let finalClosingBalance = previousOpeningBalance + monthlyNetBalance;
+
+            document.getElementById("totalCredit").innerText = totalCredit.toFixed(2);
+            document.getElementById("totalDebit").innerText = totalDebit.toFixed(2);
+            document.getElementById("totalClaim").innerText = totalClaim.toFixed(2);
+            document.getElementById("totalNetStockOut").innerText = totalNetStockOut.toFixed(2);
+            
+            let balanceText = `${Math.abs(finalClosingBalance).toFixed(2)} (${finalClosingBalance >= 0 ? 'Surplus' : 'Deficit'})`;
+            if (previousOpeningBalance !== 0) {
+                balanceText += ` [পূর্বের জেরসহ]`;
+            }
+            document.getElementById("closingBalance").innerText = balanceText;
+
+            renderPagination(totalPages);
+        };
+
+        function renderPagination(totalPages) {
+            const paginationControls = document.getElementById("paginationControls");
+            paginationControls.innerHTML = "";
+
+            if (totalPages <= 1) return;
+
+            let prevDisabled = currentPage === 1 ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700";
+            let nextDisabled = currentPage === totalPages ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700";
+
+            let paginationHTML = `
+                <div class="text-sm text-gray-600">
+                    পৃষ্ঠা <span class="font-bold">${currentPage}</span> / <span class="font-bold">${totalPages}</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="changePage(${currentPage - 1})" class="bg-blue-600 text-white px-3 py-1 rounded text-sm ${prevDisabled}">পূর্ববর্তী</button>
+                    <button onclick="changePage(${currentPage + 1})" class="bg-blue-600 text-white px-3 py-1 rounded text-sm ${nextDisabled}">পরবর্তী</button>
+                </div>
+            `;
+            paginationControls.innerHTML = paginationHTML;
+        }
+
+        window.changePage = function(page) {
+            currentPage = page;
+            renderTable();
+        };
+
+        document.getElementById("invoiceForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            
+            const date = document.getElementById("date").value;
+            const brand = document.getElementById("brandSelect").value;
+            const type = document.getElementById("invoiceType").value;
+            const number = document.getElementById("invoiceNumber").value;
+            const credit = document.getElementById("credit").value;
+            const debit = document.getElementById("debit").value;
+            const claim = document.getElementById("claim").value;
+
+            if (type === "Stock In" && !credit) {
+                alert("দয়া করে স্টক ইন-এর পরিমাণ লিখুন।");
+                return;
+            }
+            if (type === "Stock Out" && !debit) {
+                alert("দয়া করে স্টক আউট-এর পরিমাণ লিখুন।");
+                return;
+            }
+
+            const newEntry = { date, brand, type, number: parseInt(number), credit: credit || "", debit: debit || "", claim: claim || "" };
+
+            try {
+                const docRef = await addDoc(collection(db, "invoices"), newEntry);
+                newEntry.id = docRef.id;
+                entries.push(newEntry);
+                entries.sort((a, b) => parseInt(a.number) - parseInt(b.number));
+                
+                nextInvoiceNum = parseInt(number) + 1;
+
+                showInvoiceDetails(newEntry);
+
+                document.getElementById("invoiceNumber").value = nextInvoiceNum;
+                document.getElementById("credit").value = "";
+                document.getElementById("debit").value = "";
+                document.getElementById("claim").value = "";
+
+                updateMonthFilter();
+                renderTable();
+                currentPage = 1;
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                alert("ডেটা সেভ করতে সমস্যা হয়েছে।");
+            }
+        });
+
+        window.openInvoiceByNumber = function(number) {
+            let found = entries.find(item => item.number.toString() === number.toString());
+            if (found) {
+                showInvoiceDetails(found);
+            } else {
+                alert("ইনভয়েসটি পাওয়া যায়নি!");
+            }
+        };
+
+        function showInvoiceDetails(item) {
+            let entryMonth = item.date ? item.date.substring(0, 7) : '';
+            let monthEntries = entries.filter(e => e.date && e.date.startsWith(entryMonth));
+            if(!monthEntries.some(e => e.number === item.number)) {
+                monthEntries.push(item);
+            }
+            
+            let mCredit = 0, mDebit = 0, mClaim = 0;
+            monthEntries.forEach(e => {
+                if(e.credit) mCredit += parseFloat(e.credit);
+                if(e.debit) mDebit += parseFloat(e.debit);
+                if(e.claim) mClaim += parseFloat(e.claim);
+            });
+            let mNetStockOut = mDebit - mClaim;
+            let mClosing = mCredit - mDebit;
+            let mBalanceText = `${Math.abs(mClosing).toFixed(2)} (${mClosing >= 0 ? 'Surplus' : 'Deficit'})`;
+            let amount = item.credit || item.debit;
+
+            document.getElementById("printInvoiceNum").innerText = item.number;
+            document.getElementById("printDate").innerText = item.date;
+            document.getElementById("printBrand").innerText = item.brand || 'Kodomo';
+            document.getElementById("printType").innerText = item.type;
+            document.getElementById("printAmount").innerText = amount ? parseFloat(amount).toFixed(2) : '0.00';
+            
+            document.getElementById("printMonthCredit").innerText = mCredit.toFixed(2);
+            document.getElementById("printMonthDebit").innerText = mDebit.toFixed(2);
+            document.getElementById("printMonthClaim").innerText = mClaim.toFixed(2);
+            document.getElementById("printMonthNetStockOut").innerText = mNetStockOut.toFixed(2);
+            document.getElementById("printClosingBalance").innerText = mBalanceText;
+            
+            document.getElementById("invoiceModal").classList.remove("hidden");
+        }
+
+        window.closeInvoiceModal = function() {
+            document.getElementById("invoiceModal").classList.add("hidden");
+        };
+
+        window.deleteEntry = async function(id) {
+            if(confirm("আপনি কি নিশ্চিতভাবে এই এন্ট্রিটি ডিলিট করতে চান?")) {
+                try {
+                    await deleteDoc(doc(db, "invoices", id));
+                    loadEntriesFromCloud();
+                } catch (error) {
+                    console.error("Error removing document: ", error);
+                    alert("ডিলিট করতে সমস্যা হয়েছে।");
+                }
+            }
+        };
+
+        window.exportData = function() {
+            if(entries.length === 0) {
+                alert("এক্সপোর্ট করার মতো কোনো ডেটা নেই!");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,Date,Brand,Invoice Type,Invoice Number,Stock In,Stock Out,Claim,Net Stock Out\n";
+            
+            let totalCredit = 0, totalDebit = 0, totalClaim = 0;
+
+            entries.forEach(row => {
+                let cr = row.credit ? parseFloat(row.credit) : 0;
+                let dr = row.debit ? parseFloat(row.debit) : 0;
+                let cl = row.claim ? parseFloat(row.claim) : 0;
+                let netOut = dr > 0 ? (dr - cl) : 0;
+
+                totalCredit += cr;
+                totalDebit += dr;
+                totalClaim += cl;
+
+                csvContent += `${row.date || ''},${row.brand || 'Kodomo'},${row.type},${row.number || ''},${row.credit || ''},${row.debit || ''},${row.claim || ''},${netOut > 0 ? netOut.toFixed(2) : ''}\n`;
+            });
+
+            let totalNetOut = totalDebit - totalClaim;
+            let closingBalance = totalCredit - totalDebit;
+
+            csvContent += `\n`;
+            csvContent += `,,,,${totalCredit.toFixed(2)},${totalDebit.toFixed(2)},${totalClaim.toFixed(2)},${totalNetOut.toFixed(2)}\n`;
+            csvContent += `,,,Stock Remaining,,,,,${closingBalance.toFixed(2)}\n`;
+
+            var encodedUri = encodeURI(csvContent);
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "Good_Mart_Enterprise_Inventory.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+    </script>
+</body>
+</html>
