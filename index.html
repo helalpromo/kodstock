@@ -655,7 +655,14 @@
         };
 
         window.exportData = function() {
-            if(entries.length === 0) {
+            const monthFilter = document.getElementById("monthFilter").value;
+            
+            let exportEntries = entries;
+            if (monthFilter) {
+                exportEntries = entries.filter(item => item.date && item.date.startsWith(monthFilter));
+            }
+
+            if(exportEntries.length === 0) {
                 alert("এক্সপোর্ট করার মতো কোনো ডেটা নেই!");
                 return;
             }
@@ -664,7 +671,7 @@
             
             let totalCredit = 0, totalDebit = 0, totalClaim = 0;
 
-            entries.forEach(row => {
+            exportEntries.forEach(row => {
                 let cr = row.credit ? parseFloat(row.credit) : 0;
                 let dr = row.debit ? parseFloat(row.debit) : 0;
                 let cl = row.claim ? parseFloat(row.claim) : 0;
@@ -687,7 +694,7 @@
             var encodedUri = encodeURI(csvContent);
             var link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "Good_Mart_Enterprise_Inventory.csv");
+            link.setAttribute("download", monthFilter ? `Good_Mart_Enterprise_${monthFilter}.csv` : "Good_Mart_Enterprise_Inventory.csv");
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
