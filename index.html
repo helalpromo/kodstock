@@ -163,9 +163,17 @@
                 </div>
             </div>
 
-            <div class="flex justify-between items-center mb-4">
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
                 <h2 class="text-xl font-semibold text-gray-700">সকল লেনদেনের তালিকা</h2>
-                <button onclick="exportData()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm">ডেটা এক্সপোর্ট (CSV)</button>
+                <div class="flex gap-2">
+                    <!-- Import CSV Button -->
+                    <label class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded text-sm cursor-pointer">
+                        ডেটা ইম্পোর্ট (CSV)
+                        <input type="file" id="csvFileInput" accept=".csv" onchange="importData(event)" class="hidden">
+                    </label>
+                    <!-- Export CSV Button -->
+                    <button onclick="exportData()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm">ডেটা এক্সপোর্ট (CSV)</button>
+                </div>
             </div>
             
             <div class="overflow-x-auto">
@@ -290,23 +298,8 @@
 
     <!-- Firebase SDK & App Logic -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-analytics.js";
-        import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyAEE9A8KVaYYescQaZIqqll0N-shR35V5I",
-            authDomain: "kodomo-stock-count.firebaseapp.com",
-            projectId: "kodomo-stock-count",
-            storageBucket: "kodomo-stock-count.firebasestorage.app",
-            messagingSenderId: "592258548445",
-            appId: "1:592258548445:web:beefd0ef76b23e4f689134",
-            measurementId: "G-68MB6J7EJJ"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
-        const db = getFirestore(app);
+        import { db } from "./js/firebase-config.js";
+        import { collection, getDocs, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
 
         const CORRECT_USER = "kodomo";
         const CORRECT_PASS = "Helal9090";
@@ -652,6 +645,64 @@
                     alert("ডিলিট করতে সমস্যা হয়েছে।");
                 }
             }
+        };
+
+        // CSV Import Functionality
+        window.importData = async function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const lines = text.split('\n');
+                let successCount = 0;
+
+                if (!confirm("আপনি কি সিএসভি ফাইল থেকে ডেটা ক্লাউডে ইম্পোর্ট করতে চান?")) {
+                    event.target.value = '';
+                    return;
+                }
+
+                for (let i = 1; i < lines.length; i++) {
+                    let line = lines[i].trim();
+                    if (!line) continue;
+
+                    let cols = line.split(',');
+                    if (cols.length >= 6) {
+                        let dat = cols[0]?.trim();
+                        let bra = cols[1]?.trim() || 'Kodomo';
+                        let typ = cols[2]?.trim();
+                        let num = parseInt(cols[3]?.trim());
+                        let cre = cols[4]?.trim();
+                        let deb = cols[5]?.trim();
+                        let cla = cols[6]?.trim() || '';
+
+                        if (dat && typ && !isNaN(num)) {
+                            let newEntry = {
+                                date: dat,
+                                brand: bra,
+                                type: typ,
+                                number: num,
+                                credit: cre || "",
+                                debit: deb || "",
+                                claim: cla || ""
+                            };
+
+                            try {
+                                await addDoc(collection(db, "invoices"), newEntry);
+                                successCount++;
+                            } catch (err) {
+                                console.error("Error importing row: ", err);
+                            }
+                        }
+                    }
+                }
+
+                alert(`সফলভাবে ${successCount} টি এন্ট্রি ক্লাউডে ইম্পোর্ট করা হয়েছে!`);
+                event.target.value = '';
+                loadEntriesFromCloud();
+            };
+            reader.readAsText(file);
         };
 
         window.exportData = function() {
