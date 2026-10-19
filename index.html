@@ -65,6 +65,18 @@
             <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded text-sm">লগআউট</button>
         </div>
 
+        <!-- Top Stock Remaining Summary Box -->
+        <div class="mb-8 p-6 bg-gradient-to-r from-blue-800 to-indigo-900 rounded-xl shadow-lg text-white flex flex-col md:flex-row justify-between items-center no-print">
+            <div>
+                <span class="text-xs uppercase tracking-wider text-blue-200 font-semibold">বর্তমান স্টক (CURRENT STOCK REMAINING)</span>
+                <div id="topClosingBalance" class="text-3xl md:text-4xl font-extrabold mt-1">0.00</div>
+            </div>
+            <button onclick="refreshStockData()" class="mt-4 md:mt-0 bg-blue-700 hover:bg-blue-600 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition shadow text-sm border border-blue-500">
+                <svg id="refreshIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                রিফ্রেশ স্টক
+            </button>
+        </div>
+
         <!-- Form Section -->
         <div class="bg-white shadow-md rounded-lg p-6 mb-8 no-print">
             <h2 class="text-xl font-semibold mb-4 text-gray-700">নতুন এন্ট্রি করুন</h2>
@@ -365,11 +377,33 @@
 
                 updateMonthFilter();
                 renderTable();
+                updateTopClosingBalance();
             } catch (error) {
                 console.error("Error getting documents: ", error);
                 alert("ক্লাউড থেকে ডেটা লোড করতে সমস্যা হচ্ছে।");
             }
         }
+
+        function updateTopClosingBalance() {
+            let totalCr = 0;
+            let totalDr = 0;
+            entries.forEach(item => {
+                if(item.credit) totalCr += parseFloat(item.credit);
+                if(item.debit) totalDr += parseFloat(item.debit);
+            });
+            let totalBalance = totalCr - totalDr;
+            let balanceText = `${Math.abs(totalBalance).toFixed(2)} (${totalBalance >= 0 ? 'Surplus' : 'Deficit'})`;
+            document.getElementById("topClosingBalance").innerText = balanceText;
+        }
+
+        window.refreshStockData = async function() {
+            const icon = document.getElementById("refreshIcon");
+            if (icon) icon.classList.add("animate-spin");
+            await loadEntriesFromCloud();
+            setTimeout(() => {
+                if (icon) icon.classList.remove("animate-spin");
+            }, 500);
+        };
 
         window.handleTypeChange = function() {
             const type = document.getElementById("invoiceType").value;
@@ -582,6 +616,7 @@
 
                 updateMonthFilter();
                 renderTable();
+                updateTopClosingBalance();
                 currentPage = 1;
             } catch (error) {
                 console.error("Error adding document: ", error);
